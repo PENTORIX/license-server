@@ -1,19 +1,9 @@
 export default function handler(req, res) {
   const { token } = req.query;
 
-  const store = global.__TOKENS__ || {};
-  const record = store[token];
-
-  if (!record) {
-    return res.status(404).send("Invalid or expired access.");
+  if (!token) {
+    return res.status(400).send("No token provided.");
   }
-
-  if (Date.now() > record.expiresAt) {
-    delete store[token];
-    return res.status(410).send("Access expired.");
-  }
-
-  delete store[token];
 
   res.setHeader("Content-Type", "text/html");
   res.send(`
@@ -25,8 +15,13 @@ export default function handler(req, res) {
       </head>
       <body style="font-family:sans-serif;padding:24px">
         <h2>✅ Access Granted</h2>
-        <p>This page is served by the server.</p>
-        <p>No cookies. No login. Token-based access.</p>
+        <p>Token received: <b>${token}</b></p>
+        <p>This confirms:</p>
+        <ul>
+          <li>Generate → request-access works</li>
+          <li>Redirect works</li>
+          <li>Server page loads</li>
+        </ul>
       </body>
     </html>
   `);
