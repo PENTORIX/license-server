@@ -23,9 +23,11 @@ export default function handler(req, res) {
   global.__TOKENS__ = global.__TOKENS__ || {};
   global.__TOKENS__[token] = { expiresAt };
 
-  return res.json({
-    ok: true,
-    access_url: `/access/${token}`,
-    expires_in: 300
-  });
+ return res.json({
+  ok: true,
+  access_url: `/api/access/${token}`,
+  expires_in: 300
+});
+
 }
+
