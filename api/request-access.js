@@ -1,4 +1,4 @@
-export default function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false });
   }
@@ -18,16 +18,24 @@ export default function handler(req, res) {
   }
 
   const token = Math.random().toString(36).slice(2);
-  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+  const ttl = 300; // 5 minutes
 
-  global.__TOKENS__ = global.__TOKENS__ || {};
-  global.__TOKENS__[token] = { expiresAt };
+  // SAVE TOKEN TO UPSTASH (REAL STORAGE)
+  await fetch(`${process.env.KV_REST_API_URL}/set/access:${token}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      value: JSON.stringify({ license }),
+      ex: ttl
+    })
+  });
 
- return res.json({
-  ok: true,
-  access_url: `/api/access/${token}`,
-  expires_in: 300
-});
-
+  return res.json({
+    ok: true,
+    access_url: `/api/access/${token}`,
+    expires_in: ttl
+  });
 }
-
