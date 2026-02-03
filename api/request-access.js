@@ -3,7 +3,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false });
   }
 
-  const { license } = req.body || {};
+  const body = req.body || {};
+  const license = body.license;
+
   if (!license) {
     return res.status(400).json({ ok: false, reason: "no license" });
   }
@@ -18,9 +20,14 @@ export default async function handler(req, res) {
   }
 
   const token = Math.random().toString(36).slice(2);
-  const ttl = 300; // 5 minutes
+  const ttl = 300;
 
-  // SAVE TOKEN TO UPSTASH (REAL STORAGE)
+  // ✅ SAVE EXACT STRUCTURE
+  const valueToStore = {
+    license: license,
+    createdAt: Date.now()
+  };
+
   await fetch(`${process.env.KV_REST_API_URL}/set/access:${token}`, {
     method: "POST",
     headers: {
@@ -28,7 +35,7 @@ export default async function handler(req, res) {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      value: JSON.stringify({ license }),
+      value: JSON.stringify(valueToStore),
       ex: ttl
     })
   });
