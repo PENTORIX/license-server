@@ -17,11 +17,13 @@ export default async function handler(req, res) {
     return res.status(404).send("Invalid or expired access.");
   }
 
-  let data;
+  // 🔥 FIX: DOUBLE PARSE
+  let stored;
   try {
-    data = JSON.parse(j.result);
+    stored = JSON.parse(j.result);          // { value: "...", ex: 300 }
+    stored = JSON.parse(stored.value);     // { license: "...", createdAt: ... }
   } catch {
-    return res.status(500).send("Failed to parse token data.");
+    return res.status(500).send("Failed to parse stored token.");
   }
 
   // one-time use
@@ -38,8 +40,6 @@ export default async function handler(req, res) {
   res.setHeader("Content-Type", "text/html");
   res.send(`
     <h2>✅ Access Granted</h2>
-    <p><b>Stored data:</b></p>
-    <pre>${JSON.stringify(data, null, 2)}</pre>
-    <p>License: <b>${data.license}</b></p>
+    <p>License: <b>${stored.license}</b></p>
   `);
 }
