@@ -18,7 +18,15 @@ export default async function handler(req, res) {
     return res.status(404).send("Invalid or expired access.");
   }
 
-  // DELETE token (one-time use)
+  // 🔧 FIX: parse the stored JSON STRING properly
+  let data;
+  try {
+    data = JSON.parse(j.result);
+  } catch (e) {
+    return res.status(500).send("Corrupted token data.");
+  }
+
+  // ONE-TIME USE: delete token
   await fetch(
     `${process.env.KV_REST_API_URL}/del/access:${token}`,
     {
@@ -29,11 +37,9 @@ export default async function handler(req, res) {
     }
   );
 
-  const data = JSON.parse(j.result);
-
   res.setHeader("Content-Type", "text/html");
   res.send(`
     <h2>✅ Access Granted</h2>
-    <p>License: ${data.license}</p>
+    <p>License: <b>${data.license}</b></p>
   `);
 }
