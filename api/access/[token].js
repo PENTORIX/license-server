@@ -2,7 +2,6 @@ export default async function handler(req, res) {
   const { token } = req.query;
   if (!token) return res.status(400).send("No token");
 
-  // READ token from Upstash
   const r = await fetch(
     `${process.env.KV_REST_API_URL}/get/access:${token}`,
     {
@@ -18,15 +17,14 @@ export default async function handler(req, res) {
     return res.status(404).send("Invalid or expired access.");
   }
 
-  // 🔧 FIX: parse the stored JSON STRING properly
   let data;
   try {
     data = JSON.parse(j.result);
-  } catch (e) {
-    return res.status(500).send("Corrupted token data.");
+  } catch {
+    return res.status(500).send("Failed to parse token data.");
   }
 
-  // ONE-TIME USE: delete token
+  // one-time use
   await fetch(
     `${process.env.KV_REST_API_URL}/del/access:${token}`,
     {
@@ -40,6 +38,8 @@ export default async function handler(req, res) {
   res.setHeader("Content-Type", "text/html");
   res.send(`
     <h2>✅ Access Granted</h2>
+    <p><b>Stored data:</b></p>
+    <pre>${JSON.stringify(data, null, 2)}</pre>
     <p>License: <b>${data.license}</b></p>
   `);
 }
