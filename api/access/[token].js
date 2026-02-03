@@ -1,45 +1,39 @@
-import { kv } from "@vercel/kv";
-
 export default async function handler(req, res) {
   const { token } = req.query;
+  if (!token) return res.status(400).send("No token");
 
-  if (!token) {
-    return res.status(400).send("No token provided.");
-  }
+  // READ token from Upstash
+  const r = await fetch(
+    `${process.env.KV_REST_API_URL}/get/access:${token}`,
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}`
+      }
+    }
+  );
 
-  // Get token from Redis
-  const data = await kv.get(`access:${token}`);
+  const j = await r.json();
 
-  if (!data) {
+  if (!j.result) {
     return res.status(404).send("Invalid or expired access.");
   }
 
-  // One-time use
-  await kv.del(`access:${token}`);
+  // DELETE token (one-time use)
+  await fetch(
+    `${process.env.KV_REST_API_URL}/del/access:${token}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}`
+      }
+    }
+  );
+
+  const data = JSON.parse(j.result);
 
   res.setHeader("Content-Type", "text/html");
   res.send(`
-    <!doctype html>
-    <html>
-      <head>
-        <meta charset="utf-8"/>
-        <title>Access Granted</title>
-        <style>
-          body { font-family: sans-serif; padding: 24px; }
-          .ok { color: green; font-weight: bold; }
-        </style>
-      </head>
-      <body>
-        <h2 class="ok">✅ Access Granted</h2>
-        <p>License: <b>${data.license}</b></p>
-        <p>This access is:</p>
-        <ul>
-          <li>Server-controlled</li>
-          <li>Token-based</li>
-          <li>One-time use</li>
-          <li>Auto-expiring (Redis TTL)</li>
-        </ul>
-      </body>
-    </html>
+    <h2>✅ Access Granted</h2>
+    <p>License: ${data.license}</p>
   `);
 }
