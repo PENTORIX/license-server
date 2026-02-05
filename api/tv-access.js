@@ -1,24 +1,21 @@
 import { createClient } from '@supabase/supabase-js'
 
 export default async function handler(req, res) {
-  // CORS para pwede tawagin galing sa extension
+  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 
-  // Handle preflight OPTIONS request (kailangan para sa CORS sa browser)
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end()
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  // Dapat POST lang
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
+  const body = req.body || {}
 
-  const { tvCode, premiumKey, extensionId, tvHardwareId } = req.body || {}
+  // Log para makita mo sa Vercel logs kung natanggap ba
+  console.log('TV ACCESS REQUEST RECEIVED:', body)
 
-  // Basic validation
+  const { tvCode, premiumKey, extensionId, tvHardwareId } = body
+
   if (!tvCode || tvCode.length !== 8 || !/^\d{8}$/.test(tvCode)) {
     return res.status(400).json({ error: 'Invalid TV code format. Must be exactly 8 digits.' })
   }
@@ -28,62 +25,52 @@ export default async function handler(req, res) {
   }
 
   // Supabase client
-  const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_ANON_KEY
-  )
+  const supabaseUrl = process.env.SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('Missing Supabase env vars')
+    return res.status(500).json({ error: 'Server configuration error' })
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseKey)
 
   try {
-    // 1. Check kung may existing binding na sa premium_key (kahit ibang extension)
+    // Check existing binding for this premium key
     const { data: existing, error: checkError } = await supabase
       .from('tv_hardware_bindings')
       .select('*')
       .eq('premium_key', premiumKey)
       .maybeSingle()
 
-    if (checkError) {
-      console.error('Supabase check error:', checkError)
-      throw checkError
-    }
+    if (checkError) throw checkError
 
     if (existing) {
-      // May binding na sa key na 'to
       if (existing.tv_hardware_id === tvHardwareId) {
-        // Same TV hardware → okay pa rin (pwede ulit gamitin)
-        return res.status(200).json({
-          success: true,
-          message: 'TV hardware already linked. Access granted.'
-        })
+        return res.status(200).json({ success: true, message: 'TV hardware already linked' })
       } else {
-        // Ibang TV hardware → bawal
-        return res.status(403).json({
-          error: 'This premium key is already linked to a different TV hardware. Cannot link another TV.'
+        return res.status(403).json({ 
+          error: 'This premium key is already linked to a different TV hardware. Cannot link another TV.' 
         })
       }
     }
 
-    // 2. Walang binding pa → mag-insert ng bago
+    // Insert new binding
     const { error: insertError } = await supabase
       .from('tv_hardware_bindings')
       .insert({
         premium_key: premiumKey,
-        extension_id: extensionId || 'unknown',  // optional, record lang
+        extension_id: extensionId || 'unknown',
         tv_hardware_id: tvHardwareId,
         created_at: new Date().toISOString()
       })
 
-    if (insertError) {
-      console.error('Supabase insert error:', insertError)
-      throw insertError
-    }
+    if (insertError) throw insertError
 
-    return res.status(200).json({
-      success: true,
-      message: 'TV hardware linked successfully. Access granted.'
-    })
+    return res.status(200).json({ success: true, message: 'TV hardware linked successfully' })
 
   } catch (err) {
-    console.error('TV access endpoint error:', err)
+    console.error('TV ACCESS ENDPOINT ERROR:', err.message)
     return res.status(500).json({ error: 'Server error occurred' })
   }
 }
