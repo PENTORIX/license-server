@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   )
 
   try {
-    // Validate key first (optional pero mas secure)
+    // Validate premium key
     const { data: keyData, error: keyError } = await supabase
       .from('premium_keys')
       .select('is_active')
@@ -31,23 +31,40 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Invalid or inactive premium key' })
     }
 
-    // Random select ng 1 cookie mula sa premium_cookies table
+    // Debug: total active premium cookies
+    const { count, error: countError } = await supabase
+      .from('premium_cookies')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true)
+
+    console.log('Total active premium cookies:', count)
+
+    if (countError) throw countError
+
+    if (count === 0) {
+      return res.status(404).json({ error: 'No active premium cookies available' })
+    }
+
+    // Random pick ng 1 active premium cookie
     const { data, error } = await supabase
       .from('premium_cookies')
       .select('cookie_string')
-      .eq('is_active', true)    // optional
+      .eq('is_active', true)
       .order('random()')
       .limit(1)
       .single()
 
     if (error || !data) {
-      return res.status(404).json({ error: 'No premium cookies available' })
+      console.log('Premium cookie query error:', error)
+      return res.status(404).json({ error: 'No active premium cookies' })
     }
+
+    console.log('Selected premium cookie:', data.cookie_string.substring(0, 50) + '...')
 
     return res.status(200).json({ cookieString: data.cookie_string })
 
   } catch (err) {
-    console.error('Fetch premium cookie error:', err)
-    return res.status(500).json({ error: 'Server error' })
+    console.error('Fetch premium cookie error:', err.message)
+    return res.status(500).json({ error: 'Server error: ' + err.message })
   }
 }
