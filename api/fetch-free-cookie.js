@@ -14,23 +14,40 @@ export default async function handler(req, res) {
   )
 
   try {
-    // Random select ng 1 cookie mula sa free_cookies table
+    // Debug: total active cookies
+    const { count, error: countError } = await supabase
+      .from('free_cookies')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true)
+
+    console.log('Total active free cookies:', count)
+
+    if (countError) throw countError
+
+    if (count === 0) {
+      return res.status(404).json({ error: 'No active free cookies available' })
+    }
+
+    // Random pick ng 1 active cookie
     const { data, error } = await supabase
       .from('free_cookies')
-      .select('cookie_string')  // kunin lang 'yung cookie string column
-      .eq('is_active', true)    // optional: kung may active flag
-      .order('random()')        // PostgreSQL random order
+      .select('cookie_string')
+      .eq('is_active', true)
+      .order('random()')
       .limit(1)
       .single()
 
     if (error || !data) {
-      return res.status(404).json({ error: 'No free cookies available' })
+      console.log('Free cookie query error:', error)
+      return res.status(404).json({ error: 'No active free cookies' })
     }
+
+    console.log('Selected free cookie:', data.cookie_string.substring(0, 50) + '...')
 
     return res.status(200).json({ cookieString: data.cookie_string })
 
   } catch (err) {
-    console.error('Fetch free cookie error:', err)
-    return res.status(500).json({ error: 'Server error' })
+    console.error('Fetch free cookie error:', err.message)
+    return res.status(500).json({ error: 'Server error: ' + err.message })
   }
 }
