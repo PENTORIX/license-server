@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   )
 
   try {
-    // Debug: total active cookies
+    // Check total active cookies
     const { count, error: countError } = await supabase
       .from('free_cookies')
       .select('*', { count: 'exact', head: true })
@@ -22,7 +22,10 @@ export default async function handler(req, res) {
 
     console.log('Total active free cookies:', count)
 
-    if (countError) throw countError
+    if (countError) {
+      console.error('Count error:', countError.message)
+      throw countError
+    }
 
     if (count === 0) {
       return res.status(404).json({ error: 'No active free cookies available' })
@@ -38,8 +41,8 @@ export default async function handler(req, res) {
       .single()
 
     if (error || !data) {
-      console.log('Free cookie query error:', error)
-      return res.status(404).json({ error: 'No active free cookies' })
+      console.log('Free cookie query error:', error ? error.message : 'No data')
+      return res.status(404).json({ error: 'No active free cookies found' })
     }
 
     console.log('Selected free cookie:', data.cookie_string.substring(0, 50) + '...')
