@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     const { data: binding, error: bindingError } = await supabase
       .from('premium_key_bindings')
       .select('device_hardware_id')
-      .eq('premium_key', key)  // <-- FIXED: match sa column name mo
+      .eq('premium_key', key)
       .single()
 
     if (bindingError && bindingError.code !== 'PGRST116') {
@@ -57,10 +57,10 @@ export default async function handler(req, res) {
     const { error: upsertError } = await supabase
       .from('premium_key_bindings')
       .upsert({
-        premium_key: key,  // <-- FIXED: match sa column name mo
+        premium_key: key,
         device_hardware_id: deviceHardwareId,
-        last_used: new Date().toISOString()
-      }, { onConflict: 'premium_key' })  // <-- FIXED: onConflict sa premium_key
+        last_used: new Date().toISOString()  // <-- ito 'yung column na ginamit
+      }, { onConflict: 'premium_key' })
 
     if (upsertError) {
       console.error('Upsert error:', upsertError.message)
