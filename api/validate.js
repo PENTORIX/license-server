@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   )
 
   try {
-    // 1. Validate key in premium_keys table
+    // 1. Validate key
     const { data: keyData, error: keyError } = await supabase
       .from('premium_keys')
       .select('is_active')
@@ -35,11 +35,11 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Invalid or inactive premium key' })
     }
 
-    // 2. Check if key is bound to a different device (using premium_key column)
+    // 2. Check if key is already bound to a different device
     const { data: binding, error: bindingError } = await supabase
       .from('premium_key_bindings')
       .select('device_hardware_id')
-      .eq('premium_key', key)  // FIXED: use premium_key column name
+      .eq('premium_key', key)  // <-- FIXED to match your column name
       .single()
 
     if (bindingError && bindingError.code !== 'PGRST116') {
@@ -57,10 +57,10 @@ export default async function handler(req, res) {
     await supabase
       .from('premium_key_bindings')
       .upsert({
-        premium_key: key,  // FIXED: use premium_key column name
+        premium_key: key,  // <-- FIXED to match your column name
         device_hardware_id: deviceHardwareId,
         last_used: new Date().toISOString()
-      }, { onConflict: 'premium_key' })  // FIXED: onConflict on premium_key
+      }, { onConflict: 'premium_key' })  // <-- FIXED onConflict
 
     return res.status(200).json({ valid: true })
 
