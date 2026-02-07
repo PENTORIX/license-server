@@ -15,9 +15,9 @@ export default async function handler(req, res) {
   }
 
   // Optional: kung gusto mo i-require pa rin 'yung device ID
-  // if (!deviceHardwareId) {
-  //   return res.status(400).json({ error: 'Device hardware ID required' })
-  // }
+  if (!deviceHardwareId) {
+  return res.status(400).json({ error: 'Device hardware ID required' })
+  }
 
   const supabase = createClient(
     process.env.SUPABASE_URL,
@@ -54,3 +54,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server error' })
   }
 }
+
