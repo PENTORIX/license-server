@@ -59,7 +59,7 @@ export default async function handler(req, res) {
       .upsert({
         premium_key: key,
         device_hardware_id: deviceHardwareId,
-        last_used: new Date().toISOString()  // <-- ito 'yung column na ginamit
+        last_used: new Date().toISOString()
       }, { onConflict: 'premium_key' })
 
     if (upsertError) {
