@@ -28,7 +28,7 @@ export default async function handler(req, res) {
     const { data: keyData, error: keyError } = await supabase
       .from('premium_keys')
       .select('is_active')
-      .eq('key', key)
+      .eq('premium_key', key)
       .single()
 
     if (keyError || !keyData || !keyData.is_active) {
@@ -69,3 +69,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server error: ' + err.message })
   }
 }
+
