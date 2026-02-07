@@ -14,9 +14,9 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Premium key required' })
   }
 
-  // Optional: kung gusto mo i-require pa rin 'yung device ID
+  // Optional: kung gusto mo i-require talaga 'yung device ID
   if (!deviceHardwareId) {
-  return res.status(400).json({ error: 'Device hardware ID required' })
+    return res.status(400).json({ error: 'Device hardware ID required' })
   }
 
   const supabase = createClient(
@@ -36,16 +36,14 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Invalid or inactive premium key' })
     }
 
-    // Optional: save device binding (kung gusto mo i-enable ulit later)
-    // if (deviceHardwareId) {
-    //   await supabase
-    //     .from('premium_key_bindings')
-    //     .upsert({
-    //       key,
-    //       device_hardware_id: deviceHardwareId,
-    //       last_used: new Date().toISOString()
-    //     })
-    // }
+    // Save device binding (para ma-check next time sa ibang device)
+    await supabase
+      .from('premium_key_bindings')
+      .upsert({
+        key,
+        device_hardware_id: deviceHardwareId,
+        last_used: new Date().toISOString()
+      })
 
     return res.status(200).json({ valid: true })
 
@@ -54,4 +52,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server error' })
   }
 }
-
