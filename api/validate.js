@@ -14,11 +14,9 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Premium key required' })
   }
 
-  // deviceHardwareId is optional (hindi na required para hindi mag-error kahit walang ID)
-  // kung gusto mo i-require ulit, uncomment mo lang 'yung if block sa baba
-  // if (!deviceHardwareId) {
-  //   return res.status(400).json({ error: 'Device hardware ID required' })
-  // }
+  if (!deviceHardwareId) {
+    return res.status(400).json({ error: 'Device hardware ID required' })
+  }
 
   const supabase = createClient(
     process.env.SUPABASE_URL,
@@ -26,31 +24,22 @@ export default async function handler(req, res) {
   )
 
   try {
-    // 1. Check if key exists and is active
+    // 1. Validate key in premium_keys table
     const { data: keyData, error: keyError } = await supabase
       .from('premium_keys')
       .select('is_active')
       .eq('key', key)
       .single()
 
-    if (keyError) {
-      console.error('Key query error:', keyError.message)
-      return res.status(500).json({ error: 'Server error querying key' })
+    if (keyError || !keyData || !keyData.is_active) {
+      return res.status(401).json({ error: 'Invalid or inactive premium key' })
     }
 
-    if (!keyData) {
-      return res.status(401).json({ error: 'Key not found' })
-    }
-
-    if (!keyData.is_active) {
-      return res.status(401).json({ error: 'Key is inactive' })
-    }
-
-    // 2. Check if key is bound to another device
+    // 2. Check if key is bound to a different device (using premium_key column)
     const { data: binding, error: bindingError } = await supabase
       .from('premium_key_bindings')
       .select('device_hardware_id')
-      .eq('key', key)
+      .eq('premium_key', key)  // FIXED: use premium_key column name
       .single()
 
     if (bindingError && bindingError.code !== 'PGRST116') {
@@ -65,15 +54,13 @@ export default async function handler(req, res) {
     }
 
     // 3. Bind or update binding for this device
-    if (deviceHardwareId) {
-      await supabase
-        .from('premium_key_bindings')
-        .upsert({
-          key,
-          device_hardware_id: deviceHardwareId,
-          last_used: new Date().toISOString()
-        }, { onConflict: 'key' })
-    }
+    await supabase
+      .from('premium_key_bindings')
+      .upsert({
+        premium_key: key,  // FIXED: use premium_key column name
+        device_hardware_id: deviceHardwareId,
+        last_used: new Date().toISOString()
+      }, { onConflict: 'premium_key' })  // FIXED: onConflict on premium_key
 
     return res.status(200).json({ valid: true })
 
