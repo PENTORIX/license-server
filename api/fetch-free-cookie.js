@@ -14,30 +14,39 @@ export default async function handler(req, res) {
   )
 
   try {
-    // Debug total active
-    const { count } = await supabase
+    // Get total active cookies count
+    const { count, error: countError } = await supabase
       .from('free_cookies')
       .select('*', { count: 'exact', head: true })
       .eq('is_active', true)
 
     console.log('Total active free cookies:', count)
 
+    if (countError) {
+      console.error('Count error:', countError.message)
+      return res.status(500).json({ error: 'Database error' })
+    }
+
     if (count === 0) {
       return res.status(404).json({ error: 'No active free cookies available' })
     }
 
-    // Random pick
+    // Random offset para reliable random pick
+    const randomOffset = Math.floor(Math.random() * count);
+
     const { data, error } = await supabase
       .from('free_cookies')
       .select('cookie_string')
       .eq('is_active', true)
-      .order('random()')
-      .limit(1)
+      .range(randomOffset, randomOffset)
       .single()
 
     if (error || !data) {
+      console.log('Free cookie query error:', error ? error.message : 'No data')
       return res.status(404).json({ error: 'No active free cookies found' })
     }
+
+    console.log('Selected free cookie:', data.cookie_string.substring(0, 50) + '...')
 
     return res.status(200).json({ cookieString: data.cookie_string })
 
