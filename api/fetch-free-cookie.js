@@ -14,24 +14,19 @@ export default async function handler(req, res) {
   )
 
   try {
-    // Check total active cookies
-    const { count, error: countError } = await supabase
+    // Debug total active
+    const { count } = await supabase
       .from('free_cookies')
       .select('*', { count: 'exact', head: true })
       .eq('is_active', true)
 
     console.log('Total active free cookies:', count)
 
-    if (countError) {
-      console.error('Count error:', countError.message)
-      throw countError
-    }
-
     if (count === 0) {
       return res.status(404).json({ error: 'No active free cookies available' })
     }
 
-    // Random pick ng 1 active cookie
+    // Random pick
     const { data, error } = await supabase
       .from('free_cookies')
       .select('cookie_string')
@@ -41,11 +36,8 @@ export default async function handler(req, res) {
       .single()
 
     if (error || !data) {
-      console.log('Free cookie query error:', error ? error.message : 'No data')
       return res.status(404).json({ error: 'No active free cookies found' })
     }
-
-    console.log('Selected free cookie:', data.cookie_string.substring(0, 50) + '...')
 
     return res.status(200).json({ cookieString: data.cookie_string })
 
