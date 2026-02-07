@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   )
 
   try {
-    // 1. Get or create limit record for this device
+    // 1. Get or create limit record
     let { data: limitData, error: limitError } = await supabase
       .from('free_generate_limits')
       .select('generate_count, last_used')
@@ -28,65 +28,54 @@ export default async function handler(req, res) {
       .single()
 
     let count = 0;
-    let lastUsed = new Date(0); // far past if no record
+    let lastUsed = new Date(0);
 
-    if (limitError && limitError.code !== 'PGRST116') {
-      throw limitError
-    }
+    if (limitError && limitError.code !== 'PGRST116') throw limitError
 
     if (limitData) {
       count = limitData.generate_count
       lastUsed = new Date(limitData.last_used)
     }
 
-    // 2. Check cooldown (24 hours)
+    // 2. Check cooldown
     const now = new Date()
-    const hoursSinceLastUsed = (now - lastUsed) / (1000 * 60 * 60)
+    const hoursSince = (now - lastUsed) / (1000 * 60 * 60)
 
-    if (count >= 5 && hoursSinceLastUsed < 24) {
-      const remainingHours = Math.ceil(24 - hoursSinceLastUsed)
+    if (count >= 5 && hoursSince < 24) {
+      const remainingHours = Math.ceil(24 - hoursSince)
       return res.status(403).json({ 
         error: `Free limit reached for this device. Reset in ${remainingHours} hour(s).`,
-        remainingHours // para sa countdown sa popup
+        remainingHours
       })
     }
 
-    // 3. Reset count if cooldown done
-    if (count >= 5) {
-      count = 0
-    }
+    // 3. Reset if cooldown done
+    if (count >= 5) count = 0
 
-    // 4. Fetch random active cookie
-    const { count: totalActive } = await supabase
+    // 4. Get random cookie
+    const { count: total } = await supabase
       .from('free_cookies')
       .select('*', { count: 'exact', head: true })
       .eq('is_active', true)
 
-    if (totalActive === 0) {
-      return res.status(404).json({ error: 'No active free cookies available' })
-    }
+    if (total === 0) return res.status(404).json({ error: 'No active free cookies available' })
 
-    const randomOffset = Math.floor(Math.random() * totalActive);
+    const offset = Math.floor(Math.random() * total)
 
-    const { data: cookieData, error: cookieError } = await supabase
+    const { data: cookie, error: cookieError } = await supabase
       .from('free_cookies')
       .select('cookie_string')
       .eq('is_active', true)
-      .range(randomOffset, randomOffset)
+      .range(offset, offset)
       .single()
 
-    if (cookieError || !cookieData) {
-      return res.status(404).json({ error: 'No active free cookies found' })
-    }
+    if (cookieError || !cookie) return res.status(404).json({ error: 'No active free cookies found' })
 
-    // 5. Update limit record
+    // 5. Update limit
     if (limitData) {
       await supabase
         .from('free_generate_limits')
-        .update({ 
-          generate_count: count + 1, 
-          last_used: now.toISOString() 
-        })
+        .update({ generate_count: count + 1, last_used: now.toISOString() })
         .eq('device_hardware_id', deviceHardwareId)
     } else {
       await supabase
@@ -98,10 +87,10 @@ export default async function handler(req, res) {
         })
     }
 
-    return res.status(200).json({ cookieString: cookieData.cookie_string })
+    return res.status(200).json({ cookieString: cookie.cookie_string })
 
   } catch (err) {
-    console.error('Fetch free cookie error:', err.message)
-    return res.status(500).json({ error: 'Server error: ' + err.message })
+    console.error('Fetch free error:', err.message)
+    return res.status(500).json({ error: 'Server error' })
   }
 }
