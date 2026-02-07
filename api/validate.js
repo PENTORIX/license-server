@@ -14,7 +14,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Premium key required' })
   }
 
-  // deviceHardwareId is required for strict binding
   if (!deviceHardwareId) {
     return res.status(400).json({ error: 'Device hardware ID required' })
   }
@@ -25,7 +24,7 @@ export default async function handler(req, res) {
   )
 
   try {
-    // 1. Check if key exists and is active
+    // 1. Validate key
     const { data: keyData, error: keyError } = await supabase
       .from('premium_keys')
       .select('is_active')
@@ -43,9 +42,7 @@ export default async function handler(req, res) {
       .eq('key', key)
       .single()
 
-    if (bindingError && bindingError.code !== 'PGRST116') {
-      throw bindingError
-    }
+    if (bindingError && bindingError.code !== 'PGRST116') throw bindingError
 
     if (binding && binding.device_hardware_id !== deviceHardwareId) {
       return res.status(403).json({ 
@@ -66,6 +63,6 @@ export default async function handler(req, res) {
 
   } catch (err) {
     console.error('Validate error:', err.message)
-    return res.status(500).json({ error: 'Server error: ' + err.message })
+    return res.status(500).json({ error: 'Server error' })
   }
 }
