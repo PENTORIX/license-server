@@ -14,9 +14,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Premium key required' })
   }
 
-  if (!deviceHardwareId) {
-    return res.status(400).json({ error: 'Device hardware ID required' })
-  }
+  // deviceHardwareId is optional (hindi na required para hindi mag-error kahit walang ID)
+  // kung gusto mo i-require ulit, uncomment mo lang 'yung if block sa baba
+  // if (!deviceHardwareId) {
+  //   return res.status(400).json({ error: 'Device hardware ID required' })
+  // }
 
   const supabase = createClient(
     process.env.SUPABASE_URL,
@@ -24,25 +26,37 @@ export default async function handler(req, res) {
   )
 
   try {
-    // 1. Validate key
+    // 1. Check if key exists and is active
     const { data: keyData, error: keyError } = await supabase
       .from('premium_keys')
       .select('is_active')
       .eq('key', key)
       .single()
 
-    if (keyError || !keyData || !keyData.is_active) {
-      return res.status(401).json({ error: 'Invalid or inactive premium key' })
+    if (keyError) {
+      console.error('Key query error:', keyError.message)
+      return res.status(500).json({ error: 'Server error querying key' })
     }
 
-    // 2. Check if key is already bound to a different device
+    if (!keyData) {
+      return res.status(401).json({ error: 'Key not found' })
+    }
+
+    if (!keyData.is_active) {
+      return res.status(401).json({ error: 'Key is inactive' })
+    }
+
+    // 2. Check if key is bound to another device
     const { data: binding, error: bindingError } = await supabase
       .from('premium_key_bindings')
       .select('device_hardware_id')
       .eq('key', key)
       .single()
 
-    if (bindingError && bindingError.code !== 'PGRST116') throw bindingError
+    if (bindingError && bindingError.code !== 'PGRST116') {
+      console.error('Binding query error:', bindingError.message)
+      throw bindingError
+    }
 
     if (binding && binding.device_hardware_id !== deviceHardwareId) {
       return res.status(403).json({ 
@@ -51,18 +65,20 @@ export default async function handler(req, res) {
     }
 
     // 3. Bind or update binding for this device
-    await supabase
-      .from('premium_key_bindings')
-      .upsert({
-        key,
-        device_hardware_id: deviceHardwareId,
-        last_used: new Date().toISOString()
-      }, { onConflict: 'key' })
+    if (deviceHardwareId) {
+      await supabase
+        .from('premium_key_bindings')
+        .upsert({
+          key,
+          device_hardware_id: deviceHardwareId,
+          last_used: new Date().toISOString()
+        }, { onConflict: 'key' })
+    }
 
     return res.status(200).json({ valid: true })
 
   } catch (err) {
     console.error('Validate error:', err.message)
-    return res.status(500).json({ error: 'Server error' })
+    return res.status(500).json({ error: 'Server error: ' + err.message })
   }
 }
