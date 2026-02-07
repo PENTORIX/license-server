@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   )
 
   try {
-    // Validate premium key
+    // Validate key
     const { data: keyData, error: keyError } = await supabase
       .from('premium_keys')
       .select('is_active')
@@ -31,24 +31,19 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Invalid or inactive premium key' })
     }
 
-    // Check total active premium cookies
-    const { count, error: countError } = await supabase
+    // Debug total active
+    const { count } = await supabase
       .from('premium_cookies')
       .select('*', { count: 'exact', head: true })
       .eq('is_active', true)
 
     console.log('Total active premium cookies:', count)
 
-    if (countError) {
-      console.error('Count error:', countError.message)
-      throw countError
-    }
-
     if (count === 0) {
       return res.status(404).json({ error: 'No active premium cookies available' })
     }
 
-    // Random pick ng 1 active premium cookie
+    // Random pick
     const { data, error } = await supabase
       .from('premium_cookies')
       .select('cookie_string')
@@ -58,11 +53,8 @@ export default async function handler(req, res) {
       .single()
 
     if (error || !data) {
-      console.log('Premium cookie query error:', error ? error.message : 'No data')
       return res.status(404).json({ error: 'No active premium cookies found' })
     }
-
-    console.log('Selected premium cookie:', data.cookie_string.substring(0, 50) + '...')
 
     return res.status(200).json({ cookieString: data.cookie_string })
 
